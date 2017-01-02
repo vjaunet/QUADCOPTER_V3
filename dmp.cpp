@@ -56,13 +56,13 @@ DMP::DMP()
 //---------------------------
 //         mpu setup
 //---------------------------
-void DMP::set_up() {
+uint8_t DMP::set_up() {
   // initialize device
   mpu.initialize();
 
   // verify connection
   if (!mpu.testConnection()){
-    while(1);
+    return 3;
   }
 
   // load and configure the DMP
@@ -83,13 +83,16 @@ void DMP::set_up() {
 
     // get expected DMP packet size for later comparison
     packetSize = mpu.dmpGetFIFOPacketSize();
+
+    return 0;
+
   } else {
     // ERROR!
     // 1 = initial memory load failed
     // 2 = DMP configuration updates failed
     // (if it's going to break, usually the code will be 1)
     // printf("DMP Initialization failed (code %d)\n", devStatus);
-    while(1);
+    return devStatus;
   }
 }
 
@@ -99,7 +102,7 @@ void DMP::initialize(){
 }
 
 
-int DMP::getAttitude()
+uint8_t DMP::getAttitude()
 {
   if (!dmpReady) return -1;
 

@@ -61,7 +61,6 @@ PID::PID()
   m_outmax =  350.0f;
   m_outmin = -350.0f;
 
-  InAuto = true;
 }
 
 
@@ -85,13 +84,16 @@ PID::PID(float kp_,float ki_,float kd_)
 float PID::get_deltaT()
 {
   //store timing values
-  return m_deltaT = 1e-6*((float) (micros()-m_last_loop_time));
+  uint32_t now_time=micros();
+
+  m_deltaT = 1e-6*((float) (now_time - m_last_loop_time));
+  m_last_loop_time=now_time;
+
+  return m_deltaT;
 }
 
 float PID::update_pid_std(float setpoint, float input)
 {
-
-  if (!InAuto) return m_output;
 
   //Get current time
   float dt=get_deltaT();
@@ -112,9 +114,8 @@ float PID::update_pid_std(float setpoint, float input)
   // Take care of windup boundaries :
   windup_reset();
 
-  //Save last input and time
+  //Save last input
   m_lastInput= input;
-  m_last_loop_time=micros();
 
   return m_output;
 }
@@ -140,7 +141,7 @@ void PID::reset()
 {
   //Start on fresh PID values
   m_lastInput = 0.0f;
-  m_sum_err   = m_output;
+  m_sum_err   = 0.0f;
 
   //check boundaries
   windup_reset();
@@ -157,16 +158,6 @@ void PID::windup_reset(){
     m_sum_err  += m_outmin - m_output;
     m_output   = m_outmin;
   }
-}
-
-void PID::set_mode(int Mode)
-{
-  bool newAuto = (Mode == 1);
-  if(newAuto && !InAuto)
-    {  /*we just went from manual to auto*/
-      reset();
-    }
-  InAuto = newAuto;
 }
 
 void PID::updateKpKi(float setpoint, float input)

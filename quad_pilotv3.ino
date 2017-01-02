@@ -18,7 +18,7 @@
 =====================================================================*/
 
 // To printdebug information on screen
-#define _DEBUG
+//#define _DEBUG
 
 //====================================================================
 
@@ -29,6 +29,7 @@
 #define K_YAW 260
 #define K_PITCH_ROLL 120
 
+#define THR_MIN 900
 #define RC_MIN 1000
 #define RC_MAX 2000
 
@@ -55,10 +56,10 @@ const float YPR_center=(RC_MAX-RC_MIN)/2.;
 
 #include <PinChangeInterrupt.h>
 #include <Servo.h>
-#include <Wire.h>
 #include "pid.h"
 #include "dmp.h"
 
+bool PID_ON=true;
 PID yprSTAB[2];
 PID yprRATE[3];
 
@@ -130,21 +131,36 @@ bool check_user_start(void)
   return false;
 }
 
-
+/*************************************
 // New delay routine
 // allowing for interrupts
+**************************************/
 void delay_millis(uint32_t duration){
   uint32_t last=millis();
   while(millis()-last<duration);
 }
 
+
+/*************************************
+//   Human Machine Interface
+**************************************/
 void blink_fast(uint8_t times=3)
 {
   for (uint8_t i=0;i<times;i++){
   digitalWrite(LED_PIN,0);
-  delay_millis(50);
+  delay_millis(100);
   digitalWrite(LED_PIN,1);
-  delay_millis(50);
+  delay_millis(100);
+  }
+}
+
+void blink_slow(uint8_t times=3)
+{
+  for (uint8_t i=0;i<times;i++){
+  digitalWrite(LED_PIN,0);
+  delay_millis(500);
+  digitalWrite(LED_PIN,1);
+  delay_millis(500);
   }
 }
 
@@ -154,7 +170,6 @@ void setup()
 {
 
   pinMode(LED_PIN, OUTPUT);
-  blink_fast(2);
 
   /****************************************************************
     PWM measurement settings
@@ -196,21 +211,31 @@ void setup()
     yprRATE[i].set_Kpid(rate_kp, rate_ki, rate_kd);
   }
 
+  //we should certainly set the windup bound here
+  // TO DO
+
   /********************************************
     MPU-6050 Digital Motion Processing
   *********************************************/
-  imu.set_up();
+  delay_millis(100); //wait for IMU to boot up
+  uint8_t err=imu.set_up();
+  if (err != 0) {
+    while(1){
+      blink_fast(err);
+      delay_millis(500);
+    }
+  }
 
   /***********************************************
     Do nothing until the user has decided to
   ***********************************************/
 
-  // while(!check_user_start()){
-  //   // check for DMP fifo overflow
-  //   // by this time the dmp should have reached stability
-  //   imu.getAttitude();
-  //   blink_fast(5);
-  // }
+  while(!check_user_start()){
+    // check for DMP fifo overflow
+    // by this time the dmp should have reached stability
+    imu.getAttitude();
+    blink_slow();
+  }
 
 #ifdef _DEBUG
   Serial.begin(115200);
@@ -257,8 +282,8 @@ void loop()
 #ifdef XMODE
   //Switch to Xmode instead of +mode
   //orders are given in a ref frame rotated by 90deg.
-   rc_data[PITCH_RC] =   rc_data[PITCH_RC]*cs45 +  rc_data[ROLL_RC]*cs45;
-   rc_data[ROLL_RC]  = - rc_data[PITCH_RC]*cs45 +  rc_data[ROLL_RC]*cs45;
+  rc_data[PITCH_RC] =   rc_data[PITCH_RC]*cs45 +  rc_data[ROLL_RC]*cs45;
+  rc_data[ROLL_RC]  = - rc_data[PITCH_RC]*cs45 +  rc_data[ROLL_RC]*cs45;
 #endif
 
   //Compensate lost of Thrust due to angle of drone
@@ -272,28 +297,42 @@ void loop()
 
   float PIDout[DIM];
 
-// #ifdef _DEBUG
-//   Serial.print("loop us: ");
-//   Serial.println(micros());
-// #endif
-
+  // #ifdef _DEBUG
+  //   Serial.print("loop us: ");
+  //   Serial.println(micros());
+  // #endif
 
   //STABLE PID :
 #ifdef PID_STAB
 
-  // yaw is rate PID only --
-  // pitch and roll have to be updated
-  PIDout[YAW] = rc_data[YAW_RC];
-  PIDout[PITCH] = yprSTAB[0].
-    update_pid_std(rc_data[PITCH_RC],imu.ypr[PITCH]);
-  PIDout[ROLL] = yprSTAB[1].
-    update_pid_std(rc_data[ROLL_RC],imu.ypr[ROLL]);
+  //do not update the PID while THR is low
+  //we want to be able to hold the quad avoiding
+  //the motor to spin because of some tilt
+  if (rc_data[0] < THR_MIN) {
 
-  //rate pid on all the channels
-  for (int i=0;i<DIM;i++){
-        PIDout[i] =
-  	  yprRATE[i].update_pid_std(PIDout[i],
-  				    imu.gyro[i]);
+    //Force Ouput to zero
+    for (int i=0;i<DIM;i++)  PIDout[i] = 0.0f;
+
+    //reset the PIDs
+    for (int i=0;i<DIM;i++)   yprRATE[i].reset();
+    for (int i=0;i<DIM-1;i++) yprSTAB[i].reset();
+
+  } else {  //Compute PID
+
+    // yaw is rate PID only --
+    PIDout[YAW] = rc_data[YAW_RC];
+    // pitch and roll have to be updated --
+    PIDout[PITCH] = yprSTAB[0].
+      update_pid_std(rc_data[PITCH_RC],imu.ypr[PITCH]);
+    PIDout[ROLL] = yprSTAB[1].
+      update_pid_std(rc_data[ROLL_RC],imu.ypr[ROLL]);
+
+    //rate pid on all the channels
+    for (int i=0;i<DIM;i++){
+      PIDout[i] =
+	yprRATE[i].update_pid_std(PIDout[i],
+				  imu.gyro[i]);
+    }
   }
 
 #endif
@@ -313,18 +352,10 @@ void loop()
 
   uint16_t ESC[SERVO_NUM];
 
-  if (rc_data[0] < 900) {
-    // Ensure that the motor don't spin when THR is low
-    // the Qaad is easier to grab this way
-    for (int i=0;i<SERVO_NUM;i++){
-      ESC[i] = RC_MIN;
-    }
-  } else {
-    ESC[1] = (uint16_t)(rc_data[0] + PIDout[ROLL]  + PIDout[YAW]);
-    ESC[3] = (uint16_t)(rc_data[0] - PIDout[ROLL]  + PIDout[YAW]);
-    ESC[0] = (uint16_t)(rc_data[0] + PIDout[PITCH] - PIDout[YAW]);
-    ESC[2] = (uint16_t)(rc_data[0] - PIDout[PITCH] - PIDout[YAW]);
-  }
+  ESC[1] = (uint16_t)(rc_data[0] + PIDout[ROLL]  + PIDout[YAW]);
+  ESC[3] = (uint16_t)(rc_data[0] - PIDout[ROLL]  + PIDout[YAW]);
+  ESC[0] = (uint16_t)(rc_data[0] + PIDout[PITCH] - PIDout[YAW]);
+  ESC[2] = (uint16_t)(rc_data[0] - PIDout[PITCH] - PIDout[YAW]);
 
   for (int i=0;i<SERVO_NUM;i++)
     MOTOR[i].writeMicroseconds(ESC[i]);

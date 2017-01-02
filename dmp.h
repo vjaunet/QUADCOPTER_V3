@@ -35,8 +35,8 @@ class DMP {
 
  public:
   DMP();
-  int getAttitude();
-  void set_up();
+  uint8_t getAttitude();
+  uint8_t set_up();
   void initialize();
   bool initialized;
 

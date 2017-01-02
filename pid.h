@@ -63,7 +63,6 @@ private:
   float m_outmax;
   float m_outmin;
   float m_output;
-  bool InAuto;
   uint32_t m_last_loop_time;
   float m_deltaT;
 
@@ -79,7 +78,6 @@ public:
   void  set_Kpid(float, float, float);
   void  set_windup_bounds(float, float);
   void  reset();
-  void  set_mode(int Mode);
 
   //vars
   float setpoint;
