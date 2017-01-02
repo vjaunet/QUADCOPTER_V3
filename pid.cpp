@@ -14,9 +14,11 @@
    - Derivative on measurement
    - Windsup of integral errors
 
-   Reference :
+   References :
    -"A Simple PID Controller with Adaptive Parameter in a dsPIC; Case of Study"
      http://www.aedie.org/9CHLIE-paper-send/337_CHAINHO.pdf
+   - http://brettbeauregard.com/blog/2011/04/improving-the-beginner’s-pid-onoff/
+
 
   Copyright (c) <2014> <Vincent Jaunet>
 
@@ -51,13 +53,15 @@ PID::PID()
   m_Kp = 0;
 
   //PID variables
-  m_err = 0;
-  m_last_err=0;
-  m_sum_err = 0;
-  m_ddt_err = 0;
-  m_lastInput= 0;
-  m_outmax =  350;
-  m_outmin = -350;
+  m_err = 0.0f;
+  m_last_err=0.0f;
+  m_sum_err = 0.0f;
+  m_ddt_err = 0.0f;
+  m_lastInput= 0.0f;
+  m_outmax =  350.0f;
+  m_outmin = -350.0f;
+
+  InAuto = true;
 }
 
 
@@ -78,8 +82,19 @@ PID::PID(float kp_,float ki_,float kd_)
   m_outmin = -350;
 }
 
-float PID::update_pid_std(float setpoint, float input, float dt)
+float PID::get_deltaT()
 {
+  //store timing values
+  return m_deltaT = 1e-6*((float) (micros()-m_last_loop_time));
+}
+
+float PID::update_pid_std(float setpoint, float input)
+{
+
+  if (!InAuto) return m_output;
+
+  //Get current time
+  float dt=get_deltaT();
 
   //Computes error
   m_err = setpoint-input;
@@ -92,28 +107,16 @@ float PID::update_pid_std(float setpoint, float input, float dt)
   m_ddt_err = -m_Kd / dt * (input - m_lastInput);
 
   //Calculation of the output
-  //winds up boundaries
   m_output = m_Kp*m_err + m_sum_err + m_ddt_err;
-  if (m_output > m_outmax) {
-    //winds up boundaries
-    m_sum_err  = 0.0;
-    m_output   = m_outmax;
-  }else if (m_output < m_outmin) {
-    //winds up boundaries
-    m_sum_err  = 0.0;
-    m_output   = m_outmin;
-  }
 
+  // Take care of windup boundaries :
+  windup_reset();
+
+  //Save last input and time
   m_lastInput= input;
+  m_last_loop_time=micros();
 
   return m_output;
-}
-
-void PID::reset()
-{
-  m_sum_err   = 0;
-  m_ddt_err   = 0;
-  m_lastInput = 0;
 }
 
 void PID::set_Kpid(float Kp,float Ki, float Kd)
@@ -128,6 +131,42 @@ void PID::set_windup_bounds(float Min,float Max)
 {
   m_outmax = Max;
   m_outmin = Min;
+
+  //reset windup to new boundaries :
+  windup_reset();
+}
+
+void PID::reset()
+{
+  //Start on fresh PID values
+  m_lastInput = 0.0f;
+  m_sum_err   = m_output;
+
+  //check boundaries
+  windup_reset();
+}
+
+void PID::windup_reset(){
+  //reset the windup
+  if (m_output > m_outmax) {
+    //winds up boundaries
+    m_sum_err  -= m_output - m_outmax;
+    m_output   = m_outmax;
+  }else if (m_output < m_outmin) {
+    //winds up boundaries
+    m_sum_err  += m_outmin - m_output;
+    m_output   = m_outmin;
+  }
+}
+
+void PID::set_mode(int Mode)
+{
+  bool newAuto = (Mode == 1);
+  if(newAuto && !InAuto)
+    {  /*we just went from manual to auto*/
+      reset();
+    }
+  InAuto = newAuto;
 }
 
 void PID::updateKpKi(float setpoint, float input)

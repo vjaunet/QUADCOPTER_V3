@@ -61,7 +61,6 @@ const float YPR_center=(RC_MAX-RC_MIN)/2.;
 
 PID yprSTAB[2];
 PID yprRATE[3];
-static uint32_t last_loop_time=0;
 
 DMP imu;
 
@@ -230,10 +229,6 @@ void loop()
         Get the current QUAD's attitude
   *****************************************/
   while(imu.getAttitude()<0);
-// #ifdef _DEBUG
-//   display_3f("",imu.ypr);
-//   delay_millis(500);
-// #endif
 
   /*****************************************
              Update  RC inputs
@@ -277,10 +272,6 @@ void loop()
 
   float PIDout[DIM];
 
-  //store timing values
-  float deltaT = 1e-6*((float) (micros()-last_loop_time));
-  last_loop_time=micros();
-
 // #ifdef _DEBUG
 //   Serial.print("loop us: ");
 //   Serial.println(micros());
@@ -294,16 +285,15 @@ void loop()
   // pitch and roll have to be updated
   PIDout[YAW] = rc_data[YAW_RC];
   PIDout[PITCH] = yprSTAB[0].
-    update_pid_std(rc_data[PITCH_RC],imu.ypr[PITCH],deltaT);
+    update_pid_std(rc_data[PITCH_RC],imu.ypr[PITCH]);
   PIDout[ROLL] = yprSTAB[1].
-    update_pid_std(rc_data[ROLL_RC],imu.ypr[ROLL],deltaT);
+    update_pid_std(rc_data[ROLL_RC],imu.ypr[ROLL]);
 
   //rate pid on all the channels
   for (int i=0;i<DIM;i++){
         PIDout[i] =
   	  yprRATE[i].update_pid_std(PIDout[i],
-  				    imu.gyro[i],
-  				    deltaT);
+  				    imu.gyro[i]);
   }
 
 #endif
@@ -313,8 +303,7 @@ void loop()
   for (int i=0;i<DIM;i++){
     PIDout[i] =
       yprRATE[i].update_pid_std(rc_data[i+1],
-				imu.gyro[i],
-				deltaT);
+				imu.gyro[i]);
   }
 #endif
 

@@ -43,6 +43,7 @@
 #ifndef pid
 #define pid
 
+#include <Arduino.h>
 #include <math.h>
 
 class PID {
@@ -53,7 +54,7 @@ private:
   float m_Ki;
   float m_Kd;
 
-  //PID constants
+  //PID variables
   float m_err;
   float m_last_err;
   float m_sum_err;
@@ -62,15 +63,25 @@ private:
   float m_outmax;
   float m_outmin;
   float m_output;
+  bool InAuto;
+  uint32_t m_last_loop_time;
+  float m_deltaT;
+
+  //methods
+  void  windup_reset();
+  float get_deltaT();
 
 public:
   PID();
   PID(float,float,float);
-  float update_pid_std(float setpt, float input, float dt);
+  float update_pid_std(float setpt, float input);
   void  updateKpKi(float setpt, float input);
   void  set_Kpid(float, float, float);
   void  set_windup_bounds(float, float);
   void  reset();
+  void  set_mode(int Mode);
+
+  //vars
   float setpoint;
 };
 
