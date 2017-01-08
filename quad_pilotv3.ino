@@ -78,7 +78,7 @@
 #define cs45 0.707106781186548f
 const float PR_fact  =K_PITCH_ROLL/(RC_MAX-RC_MIN);
 const float Y_fact   =K_YAW/(RC_MAX-RC_MIN);
-const float YPR_center=(RC_MAX-RC_MIN)/2.0f;
+const float YPR_center=(RC_MAX+RC_MIN)/2.0f;
 
 //====================================================================
 
