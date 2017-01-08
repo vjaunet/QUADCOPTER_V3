@@ -38,7 +38,6 @@
 // To printdebug information on screen
 //#define _DEBUG
 //#define _DEBUG_RC
-//#define _DEBUG_TIMER
 //#define _DEBUG_YPR
 //#define _DEBUG_PID
 //#define _DEBUG_ESC
@@ -51,10 +50,6 @@
 // sensitivity factors
 #define K_YAW 260.f
 #define K_PITCH_ROLL 120.f
-
-#define THR_MIN 905
-#define RC_MIN 1000.f
-#define RC_MAX 2000.f
 
 //Failsafe values
 #define THR_SAFE 1300
@@ -71,11 +66,17 @@
 #define stab_ki 0.01f
 #define stab_kd 0.5f
 
+//min and max RC values
+#define THR_MIN 905
+#define RC_MIN 1000.f
+#define RC_MAX 2000.f
+
+
 //====================================================================
 
 // some other constants defined here to
 // speed up the computations
-#define cs45 0.707106781186548f
+#define cs45 0.7071067811865f
 const float PR_fact  =K_PITCH_ROLL/(RC_MAX-RC_MIN);
 const float Y_fact   =K_YAW/(RC_MAX-RC_MIN);
 const float YPR_center=(RC_MAX+RC_MIN)/2.0f;
@@ -113,10 +114,11 @@ DMP imu;
 //define Servo variables
 #define SERVO_NUM 4
 Servo MOTOR[SERVO_NUM];
+uint16_t ESC[SERVO_NUM];
 
 //define rc data table
 #define CHAN_NUM 4
-uint16_t rc_data[CHAN_NUM];
+float rc_data[CHAN_NUM];
 
 /*************************************
  // New delay routine
@@ -246,7 +248,7 @@ void setup()
   /***************************************************************
      Set the HMI error indication timing
   ***************************************************************/
-  led.set_timing(4,50); //2 Hz, 50% DutyCycle
+  led.set_timing(5,50); //5 Hz, 50% DutyCycle
 
   /***********************************************
     Tell the user we started
@@ -274,8 +276,8 @@ void setup()
   // designed to interface directly with RC Receivers
   MOTOR[0].attach(FL_MOTOR_OUT_PIN);
   MOTOR[1].attach(FR_MOTOR_OUT_PIN);
-  MOTOR[2].attach(BL_MOTOR_OUT_PIN);
-  MOTOR[3].attach(BR_MOTOR_OUT_PIN);
+  MOTOR[2].attach(BR_MOTOR_OUT_PIN);
+  MOTOR[3].attach(BL_MOTOR_OUT_PIN);
 
   for (int i=0;i<SERVO_NUM;i++)
     MOTOR[i].writeMicroseconds(0);
@@ -380,45 +382,50 @@ void loop()
     rc_data[PITCH_RC] = PITCH_SAFE;
     rc_data[ROLL_RC]  = ROLL_SAFE;
   }else {
-    rc_data[THR_RC]   = unThrottleInShared;
-    rc_data[YAW_RC]   = unYawInShared;
-    rc_data[PITCH_RC] = unPitchInShared;
-    rc_data[ROLL_RC]  = unRollInShared;
+    rc_data[THR_RC]   = (float) unThrottleInShared;
+    rc_data[YAW_RC]   = (float) unYawInShared;
+    rc_data[PITCH_RC] = (float) unPitchInShared;
+    rc_data[ROLL_RC]  = (float) unRollInShared;
   }
 
-#ifdef _DEBUG_RC
-  Serial.print(unThrottleInShared);
-  Serial.println(" ");
-  Serial.print(unYawInShared);
-  Serial.print(" ");
-  Serial.print(unPitchInShared);
-  Serial.print(" ");
-  Serial.print(unRollInShared);
-  Serial.println(" ");
-#endif
+// #ifdef _DEBUG_RC
+//   Serial.print(unThrottleInShared);
+//   Serial.println(" ");
+//   Serial.print(unYawInShared);
+//   Serial.print(" ");
+//   Serial.print(unPitchInShared);
+//   Serial.print(" ");
+//   Serial.print(unRollInShared);
+//   Serial.println(" ");
+// #endif
 
 
   rc_data[YAW_RC]   = -(rc_data[YAW_RC]  - YPR_center)* Y_fact;
   rc_data[PITCH_RC] = (rc_data[PITCH_RC] - YPR_center)*PR_fact;
   rc_data[ROLL_RC]  = (rc_data[ROLL_RC]  - YPR_center)*PR_fact;
 
-// #ifdef _DEBUG_RC
-//   //  for (int i=0;i<DIM;i++){
-//   Serial.print(" ");
-//   char val[6];
-//   //dtostrf(rc_data[PITCH_RC],6,2,val);
-//   dtostrf(Y_fact,6,2,val);
-//   Serial.print(val);
-//   //}
-//   Serial.print(" ");
-// #endif
+#ifdef _DEBUG_RC
+
+  for (int i=1;i<2;i++){
+    Serial.print(" ");
+    char val[6];
+    dtostrf(rc_data[i],6,2,val);
+    Serial.print(val);
+  }
+  Serial.print(" ");
+  Serial.print(unYawInShared);
+  Serial.println(" ");
+#endif
 
 
 #ifdef XMODE
   //Switch to Xmode instead of +mode
-  //orders are given in a ref frame rotated by 90deg.
-  rc_data[PITCH_RC] =   rc_data[PITCH_RC]*cs45 +  rc_data[ROLL_RC]*cs45;
-  rc_data[ROLL_RC]  = - rc_data[PITCH_RC]*cs45 +  rc_data[ROLL_RC]*cs45;
+  //orders are given in a ref frame rotated by 45deg.
+  float Pitch_RC, Roll_RC;
+  Pitch_RC=   rc_data[PITCH_RC]*cs45 +  rc_data[ROLL_RC]*cs45;
+  Roll_RC =  -rc_data[PITCH_RC]*cs45 +  rc_data[ROLL_RC]*cs45;
+  rc_data[PITCH_RC] = Pitch_RC;
+  rc_data[ROLL_RC]  = Roll_RC;
 #endif
 
 
@@ -466,13 +473,14 @@ void loop()
     }
 
     //Compensate loss of Thrust due to angle of drone
-    rc_data[THR_RC] = rc_data[THR_RC]/cos(imu.ypr[ROLL]/180*M_PI)
+    rc_data[THR_RC] = rc_data[THR_RC]
+      /cos(imu.ypr[ROLL]/180*M_PI)
       /cos(imu.ypr[PITCH]/180*M_PI);
   }
 
 #endif
 
-  //RATE PID :
+  //RATE PID only:
 #ifdef PID_RATE
   for (int i=0;i<DIM;i++){
     PIDout[i] =
@@ -496,12 +504,10 @@ void loop()
            write ESC output
   ***************************************/
 
-  uint16_t ESC[SERVO_NUM];
-
-  ESC[1] = (uint16_t)(rc_data[0] + PIDout[ROLL]  + PIDout[YAW]);
-  ESC[3] = (uint16_t)(rc_data[0] - PIDout[ROLL]  + PIDout[YAW]);
-  ESC[0] = (uint16_t)(rc_data[0] + PIDout[PITCH] - PIDout[YAW]);
-  ESC[2] = (uint16_t)(rc_data[0] - PIDout[PITCH] - PIDout[YAW]);
+  ESC[1] = (uint16_t)(rc_data[0] + PIDout[ROLL]  - PIDout[YAW]);
+  ESC[3] = (uint16_t)(rc_data[0] - PIDout[ROLL]  - PIDout[YAW]);
+  ESC[0] = (uint16_t)(rc_data[0] - PIDout[PITCH] + PIDout[YAW]);
+  ESC[2] = (uint16_t)(rc_data[0] + PIDout[PITCH] + PIDout[YAW]);
 
   for (int i=0;i<SERVO_NUM;i++)
     MOTOR[i].writeMicroseconds(ESC[i]);
