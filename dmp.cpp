@@ -68,6 +68,14 @@ uint8_t DMP::set_up() {
   // load and configure the DMP
   devStatus = mpu.dmpInitialize();
 
+  // supply your own gyro offsets here, scaled for min sensitivity
+  mpu.setXGyroOffset(59);
+  mpu.setYGyroOffset(-37);
+  mpu.setZGyroOffset(10);
+  mpu.setXAccelOffset(843);
+  mpu.setYAccelOffset(1577);
+  mpu.setZAccelOffset(4703);
+
   // make sure it worked (returns 0 if so)
   if (devStatus == 0) {
     // turn on the DMP, now that it's ready

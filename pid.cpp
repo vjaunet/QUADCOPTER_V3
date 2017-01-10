@@ -42,6 +42,7 @@
 
 */
 
+#include "micros_1us.h"
 #include "pid.h"
 
 //default constructor
@@ -81,10 +82,10 @@ PID::PID(float kp_,float ki_,float kd_)
   m_outmin = -350;
 }
 
-float PID::get_deltaT()
+float PID::calc_deltaT()
 {
   //store timing values
-  uint32_t now_time=micros();
+  uint32_t now_time=m1us_micros();
 
   m_deltaT = 1e-6*((float) (now_time - m_last_loop_time));
   m_last_loop_time=now_time;
@@ -92,11 +93,16 @@ float PID::get_deltaT()
   return m_deltaT;
 }
 
+float PID::get_deltaT()
+{
+  return m_deltaT;
+}
+
 float PID::update_pid_std(float setpoint, float input)
 {
 
   //Get current time
-  float dt=get_deltaT();
+  float dt=calc_deltaT();
 
   //Computes error
   m_err = setpoint-input;

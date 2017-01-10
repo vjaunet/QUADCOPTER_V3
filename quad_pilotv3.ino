@@ -138,13 +138,15 @@ void delay_millis(uint32_t duration){
 #include "hmi.h"
 HMI led;
 
+/*************************************
+ // New 1us precision micros function
+ **************************************/
+#include "micros_1us.h"
+
 
 /*****************************************
          Receiver PWM Stuff
 *****************************************/
-#include <avr/io.h>
-#include <avr/interrupt.h>
-
 uint32_t ulThrottleStart;
 uint32_t ulYawStart;
 uint32_t ulPitchStart;
@@ -162,9 +164,9 @@ bool check_user_start(void)
 //  bottom center for 500ms to allow flying
 {
   if (unThrottleInShared < 1200 &&
-      unYawInShared      < 1200 &&
-      unPitchInShared    < 1200 &&
-      unRollInShared     > 1200 ) {
+      unYawInShared      < 1300 &&
+      unPitchInShared    < 1300 &&
+      unRollInShared     > 1300 ) {
 
     uint32_t t_old = millis();
     while (millis()-t_old < 500 ){
@@ -173,9 +175,9 @@ bool check_user_start(void)
 
     // if same we can start
     if (unThrottleInShared < 1200 &&
-        unYawInShared      < 1200 &&
-        unPitchInShared    < 1200 &&
-        unRollInShared     > 1200 ) {
+        unYawInShared      < 1300 &&
+        unPitchInShared    < 1300 &&
+        unRollInShared     > 1300 ) {
 
       return true;
     }
@@ -185,22 +187,22 @@ bool check_user_start(void)
 }
 
 bool check_receiver(void)
-//if no YPR interrupt occured for the last 1ms
+//if no YPR interrupt occured for the last 1s
 //return false -> the receiver is OFF
 {
-  if (micros()-last_reception > 100000) return false;
+  if (micros()-last_reception > 1000000) return false;
   return true;
 }
 
 void calcThrottle(){
   // if the pin is high, its a rising edge of the signal pulse, so lets record its value
   if(digitalRead(THROTTLE_IN_PIN) == HIGH){
-    ulThrottleStart = micros(); }
+    ulThrottleStart = m1us_micros(); }
   else {
     // else it must be a falling edge, so lets get the time and subtract
     // the time of the rising edge
     // this gives us the time between the rising and falling edges i.e. the pulse duration.
-    unThrottleInShared = (micros() - ulThrottleStart);
+    unThrottleInShared = (m1us_micros() - ulThrottleStart);
   }
 }
 
@@ -208,7 +210,7 @@ void calcYaw(){
   if(digitalRead(YAW_IN_PIN) == HIGH){
     ulYawStart = micros();
   }  else {
-    uint32_t now   = micros();
+    uint32_t now   = m1us_micros();
     unYawInShared  = (uint16_t)(now - ulYawStart);
     last_reception = now;
 
@@ -217,17 +219,17 @@ void calcYaw(){
 
 void calcPitch(){
   if(digitalRead(PITCH_IN_PIN) == HIGH){
-    ulPitchStart = micros();
+    ulPitchStart = m1us_micros();
   }  else {
-    unPitchInShared = (uint16_t)(micros() - ulPitchStart);
+    unPitchInShared = (uint16_t)(m1us_micros() - ulPitchStart);
   }
 }
 
 void calcRoll(){
   if(digitalRead(ROLL_IN_PIN) == HIGH){
-    ulRollStart = micros();
+    ulRollStart = m1us_micros();
   }  else {
-    unRollInShared = (uint16_t)(micros() - ulRollStart);
+    unRollInShared = (uint16_t)(m1us_micros() - ulRollStart);
   }
 }
 
@@ -239,11 +241,16 @@ void calcRoll(){
   $===================================$*/
 void setup()
 {
-#if defined(_DEBUG) ||defined(_DEBUG_RC) ||\
-  defined(_DEBUG_PID) ||defined(_DEBUG_YPR)||\
+#if defined(_DEBUG) ||defined(_DEBUG_RC) ||	\
+  defined(_DEBUG_PID) ||defined(_DEBUG_YPR)||	\
   defined(_DEBUG_ESC) || defined(_DEBUG_TIMER)
-   Serial.begin(57600);
+  Serial.begin(57600);
 #endif
+
+   /***************************************************************
+    Init the micros_1us timer 2 usage
+  ***************************************************************/
+  m1us_init();
 
   /***************************************************************
      Set the HMI error indication timing
@@ -354,7 +361,7 @@ void loop()
   uint32_t start=micros();
   while(imu.getAttitude()<0){
     //if it takes too long -> go for failsafe
-    if (micros()-start > 1e6){
+    if (micros()-start > 1000000UL){
       failsafe=true;
       break;
     }
@@ -375,8 +382,8 @@ void loop()
   /*****************************************
              Update  RC inputs
   *****************************************/
-  //Check  not in failsafe and emitter/receiver still here
-  if ( !check_receiver() || failsafe ){
+  //Check  not in failsafe
+  if ( failsafe ){
     rc_data[THR_RC]   = THR_SAFE;
     rc_data[YAW_RC]   = unYawInShared;//Yaw can be left unchanged
     rc_data[PITCH_RC] = PITCH_SAFE;
@@ -390,32 +397,29 @@ void loop()
 
 // #ifdef _DEBUG_RC
 //   Serial.print(unThrottleInShared);
-//   Serial.println(" ");
+//   Serial.print(" ");
 //   Serial.print(unYawInShared);
 //   Serial.print(" ");
 //   Serial.print(unPitchInShared);
 //   Serial.print(" ");
 //   Serial.print(unRollInShared);
-//   Serial.println(" ");
+//   Serial.print(" ");
 // #endif
+#ifdef _DEBUG_RC
+  for (int i=1;i<CHAN_NUM;i++){
+    Serial.print(" ");
+    char val[6];
+    dtostrf(rc_data[i],6,2,val);
+    Serial.print(val);
+  }
+  Serial.println(" ");
+#endif
 
 
   rc_data[YAW_RC]   = -(rc_data[YAW_RC]  - YPR_center)* Y_fact;
   rc_data[PITCH_RC] = (rc_data[PITCH_RC] - YPR_center)*PR_fact;
   rc_data[ROLL_RC]  = (rc_data[ROLL_RC]  - YPR_center)*PR_fact;
 
-#ifdef _DEBUG_RC
-
-  for (int i=1;i<2;i++){
-    Serial.print(" ");
-    char val[6];
-    dtostrf(rc_data[i],6,2,val);
-    Serial.print(val);
-  }
-  Serial.print(" ");
-  Serial.print(unYawInShared);
-  Serial.println(" ");
-#endif
 
 
 #ifdef XMODE
@@ -435,10 +439,12 @@ void loop()
 
   float PIDout[DIM];
 
-  // #ifdef _DEBUG
-  //   Serial.print("loop us: ");
-  //   Serial.println(micros());
-  // #endif
+#ifdef _DEBUG
+  Serial.print(" ");
+  char val[6];
+  dtostrf(yprRATE[0].get_deltaT()*1000,6,2,val);
+  Serial.print(val);
+#endif
 
   //STABLE PID :
 #ifdef PID_STAB

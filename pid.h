@@ -68,11 +68,12 @@ private:
 
   //methods
   void  windup_reset();
-  float get_deltaT();
+  float calc_deltaT();
 
 public:
   PID();
   PID(float,float,float);
+  float get_deltaT();
   float update_pid_std(float setpt, float input);
   void  updateKpKi(float setpt, float input);
   void  set_Kpid(float, float, float);
