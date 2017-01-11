@@ -327,6 +327,13 @@ void setup()
   }
 
   /***********************************************
+    Check the battery voltage
+  ***********************************************/
+  // TODO
+  // batt_volt=AnalogRead(A0);
+
+
+  /***********************************************
     Do nothing until the user has decided to
   ***********************************************/
   led.set_timing(1,50); //1 Hz, 50% DutyCycle
@@ -354,10 +361,24 @@ void setup()
 void loop()
 {
 
+  //failsafe bool
+  bool failsafe = false;
+
+  /*****************************************
+        Get the current batt voltage
+  *****************************************/
+  // TODO : AnalogRead a value every 10s or so
+
+  //static uint16_t Nloop=0;  Nloop++;
+  // if (Nloop == 1000 ) {
+  //   batt_volt=AnalogRead(A0);
+  // }
+  // if (batt_voltage<3.7) led.toggle();
+  // if (batt_voltage<3.2) failsafe=true;
+
   /*****************************************
         Get the current QUAD's attitude
   *****************************************/
-  bool failsafe=false;
   uint32_t start=micros();
   while(imu.getAttitude()<0){
     //if it takes too long -> go for failsafe
@@ -385,15 +406,13 @@ void loop()
   //Check  not in failsafe
   if ( failsafe ){
     rc_data[THR_RC]   = THR_SAFE;
-    rc_data[YAW_RC]   = unYawInShared;//Yaw can be left unchanged
-    rc_data[PITCH_RC] = PITCH_SAFE;
-    rc_data[ROLL_RC]  = ROLL_SAFE;
   }else {
     rc_data[THR_RC]   = (float) unThrottleInShared;
-    rc_data[YAW_RC]   = (float) unYawInShared;
-    rc_data[PITCH_RC] = (float) unPitchInShared;
-    rc_data[ROLL_RC]  = (float) unRollInShared;
   }
+
+  rc_data[YAW_RC]   = (float) unYawInShared;
+  rc_data[PITCH_RC] = (float) unPitchInShared;
+  rc_data[ROLL_RC]  = (float) unRollInShared;
 
 // #ifdef _DEBUG_RC
 //   Serial.print(unThrottleInShared);
