@@ -57,6 +57,10 @@ void HMI::on(){
   PORTD |= (1<<PD3);
 }
 
+void HMI::toggle(){
+  PORTD ^= (1<<PD3);
+}
+
 void HMI::off(){
   PORTD &= ~(1<<PD3);
 }
@@ -91,4 +95,13 @@ void HMI::blink(uint8_t Nblink,uint8_t Freq, uint8_t DC){
   _freq=freq_Save;
   _DC=DC_save;
 
+}
+
+void HMI::blink_auto_on(){
+  auto_blink=true;
+}
+
+void HMI::blink_auto_off(){
+  auto_blink=false;
+  on();
 }

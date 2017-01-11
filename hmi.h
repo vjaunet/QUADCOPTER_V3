@@ -42,13 +42,17 @@ class HMI {
  private :
   uint8_t _freq;
   uint8_t _DC;
+  bool auto_blink;
 
  public:
   HMI();
   void set_timing(uint8_t Freq, uint8_t DC);
   void blink(uint8_t Nblink);
   void blink(uint8_t Nblink,uint8_t Freq, uint8_t DC);
+  void blink_auto_on();
+  void blink_auto_off();
   void on();
+  void toggle();
   void off();
 
 

@@ -208,7 +208,7 @@ void calcThrottle(){
 
 void calcYaw(){
   if(digitalRead(YAW_IN_PIN) == HIGH){
-    ulYawStart = micros();
+    ulYawStart = m1us_micros();
   }  else {
     uint32_t now   = m1us_micros();
     unYawInShared  = (uint16_t)(now - ulYawStart);
