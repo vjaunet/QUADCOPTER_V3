@@ -55,6 +55,8 @@
 #define THR_SAFE 1300
 #define PITCH_SAFE 0.0f
 #define ROLL_SAFE 0.0f
+bool failsafe = false;
+
 
 //PID Constants
 #define yaw_rate_kp 5.0f
@@ -361,9 +363,6 @@ void setup()
 void loop()
 {
 
-  //failsafe bool
-  bool failsafe = false;
-
   /*****************************************
         Get the current batt voltage
   *****************************************/
@@ -375,30 +374,6 @@ void loop()
   // }
   // if (batt_voltage<3.7) led.toggle();
   // if (batt_voltage<3.2) failsafe=true;
-
-  /*****************************************
-        Get the current QUAD's attitude
-  *****************************************/
-  uint32_t start=micros();
-  while(imu.getAttitude()<0){
-    //if it takes too long -> go for failsafe
-    if (micros()-start > 1000000UL){
-      failsafe=true;
-      break;
-    }
-  };
-
-#ifdef _DEBUG_YPR
-  for (int i=0;i<DIM;i++){
-    Serial.print(" ");
-    char val[6];
-    dtostrf(imu.ypr[i],6,2,val);
-    Serial.print(val);
-  }
-  Serial.print(" ");
-  //  delay_millis(50);
-#endif
-
 
   /*****************************************
              Update  RC inputs
@@ -451,6 +426,29 @@ void loop()
   rc_data[ROLL_RC]  = Roll_RC;
 #endif
 
+
+  /*****************************************
+        Get the current QUAD's attitude
+  *****************************************/
+  uint32_t start=micros();
+  while(imu.getAttitude()<0){
+    //if it takes too long -> go for failsafe
+    if (micros()-start > 1000000UL){
+      failsafe=true;
+      break;
+    }
+  };
+
+#ifdef _DEBUG_YPR
+  for (int i=0;i<DIM;i++){
+    Serial.print(" ");
+    char val[6];
+    dtostrf(imu.ypr[i],6,2,val);
+    Serial.print(val);
+  }
+  Serial.print(" ");
+  //  delay_millis(50);
+#endif
 
   /**************************************
          PID Computations
