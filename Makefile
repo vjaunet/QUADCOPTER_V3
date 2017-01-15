@@ -8,7 +8,6 @@ MCU            = atmega328p
 
 USER_LIB_PATH := $(realpath ../../libraries)
 ARDUINO_LIBS = Servo PinChangeInterrupt Wire I2Cdev
-#Adafruit_GFX Adafruit_SSD1306
 
 PORT=/dev/cu.wchusbserial1410
 AVRDUDE_ARD_BAUDRATE = 57600

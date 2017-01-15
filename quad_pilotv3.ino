@@ -57,7 +57,6 @@
 #define ROLL_SAFE 0.0f
 bool failsafe = false;
 
-
 //PID Constants
 #define yaw_rate_kp 5.0f
 #define rate_kp 1.4f
