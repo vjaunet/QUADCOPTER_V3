@@ -9,7 +9,8 @@
 #include <math.h>
 #include <stdint.h>
 #include "helper_3dmath.h"
-#include "MPU6050.h"
+#include "MPU6050_6Axis_MotionApps20.h"
+//#include "MPU6050.h"
 
 class DMP {
 
