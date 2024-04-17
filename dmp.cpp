@@ -36,6 +36,8 @@
 
 */
 
+//#define _DEBUG_DMP
+
 #include "dmp.h"
 
 #define wrap_180(x) (x < -180 ? x+360 : (x > 180 ? x - 360: x))
@@ -57,12 +59,21 @@ DMP::DMP()
 //         mpu setup
 //---------------------------
 uint8_t DMP::set_up() {
+  // join I2C bus (I2Cdev library doesn't do this automatically)
+  Wire.begin();
+  Wire.setClock(400000); // 400kHz I2C clock. Comment this line if having compilation difficulties
+
   // initialize device
   mpu.initialize();
 
+#ifdef _DEBUG_DMP
+  Serial.print("Device ID: ");
+  Serial.println(mpu.getDeviceID());
+#endif
+
   // verify connection
   if (!mpu.testConnection()){
-    return 3;
+   return 3;
   }
 
   // load and configure the DMP

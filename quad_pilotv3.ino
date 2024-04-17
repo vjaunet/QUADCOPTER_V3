@@ -246,6 +246,8 @@ void setup()
   defined(_DEBUG_PID) ||defined(_DEBUG_YPR)||	\
   defined(_DEBUG_ESC) || defined(_DEBUG_TIMER)
   Serial.begin(57600);
+  Serial.println("-- Quad V3.0 --");
+  delay_millis(500);
 #endif
 
    /***************************************************************
@@ -263,6 +265,7 @@ void setup()
   ***********************************************/
   led.blink(20,20,50);
   led.on();
+  delay_millis(2000);
 
   /****************************************************************
     PWM measurement settings
@@ -311,19 +314,25 @@ void setup()
     MPU-6050 Digital Motion Processing
   *********************************************/
   delay_millis(100); //wait for IMU to boot up
-  uint8_t err=imu.set_up();
-  if (err != 0) {
-    while(1){
-      led.blink(err);
-      delay_millis(2*err*200);
-    }
+#ifdef _DEBUG
+  Serial.println("Setting up IMU...");
+  delay_millis(500);
+#endif
+
+  while (imu.set_up() != 0) {
+      led.blink(3,5,50);
+      delay_millis(500);
   }
 
   /***********************************************
     Check emitter/receiver connected and not in failssafe
   ***********************************************/
+#ifdef _DEBUG
+  Serial.println("Checking for receiver...");
+  delay_millis(500);
+#endif
   while(!check_receiver()){
-    led.blink(5);
+    led.blink(4,5,50);
     delay_millis(500);
   }
 
@@ -337,6 +346,12 @@ void setup()
   /***********************************************
     Do nothing until the user has decided to
   ***********************************************/
+#ifdef _DEBUG
+  Serial.println("Waiting for User inputs...");
+  delay_millis(500);
+#endif
+
+
   led.set_timing(1,50); //1 Hz, 50% DutyCycle
 
   while(!check_user_start()){
@@ -388,24 +403,27 @@ void loop()
   rc_data[PITCH_RC] = (float) unPitchInShared;
   rc_data[ROLL_RC]  = (float) unRollInShared;
 
-// #ifdef _DEBUG_RC
-//   Serial.print(unThrottleInShared);
-//   Serial.print(" ");
-//   Serial.print(unYawInShared);
-//   Serial.print(" ");
-//   Serial.print(unPitchInShared);
-//   Serial.print(" ");
-//   Serial.print(unRollInShared);
-//   Serial.print(" ");
-// #endif
 #ifdef _DEBUG_RC
-  for (int i=1;i<CHAN_NUM;i++){
+  Serial.print(" - ");
+  Serial.print(unThrottleInShared);
+  Serial.print(" ");
+  Serial.print(unYawInShared);
+  Serial.print(" ");
+  Serial.print(unPitchInShared);
+  Serial.print(" ");
+  Serial.print(unRollInShared);
+  Serial.print(" -");
+#endif
+
+#ifdef _DEBUG_RC
+  for (int i=0;i<CHAN_NUM;i++){
     Serial.print(" ");
     char val[6];
     dtostrf(rc_data[i],6,2,val);
     Serial.print(val);
   }
-  Serial.println(" ");
+  Serial.println(" -");
+  delay_millis(50);
 #endif
 
 
@@ -445,8 +463,8 @@ void loop()
     dtostrf(imu.ypr[i],6,2,val);
     Serial.print(val);
   }
-  Serial.print(" ");
-  //  delay_millis(50);
+  Serial.println(" ");
+  delay_millis(50);
 #endif
 
   /**************************************
@@ -455,7 +473,7 @@ void loop()
 
   float PIDout[DIM];
 
-#ifdef _DEBUG
+#ifdef _DEBUG_PID
   Serial.print(" ");
   char val[6];
   dtostrf(yprRATE[0].get_deltaT()*1000,6,2,val);
@@ -542,6 +560,5 @@ void loop()
   Serial.println(" ");
   delay_millis(20);
 #endif
-
 
 }
